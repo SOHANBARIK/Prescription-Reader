@@ -16,13 +16,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-medicine_db = pd.read_csv("master_medicines.csv")
-medicine_db["search_key"] = medicine_db["name"].str.lower().str.strip()
+# Load medicine DB if present
+medicine_db = None
+if os.path.exists("master_medicines.csv"):
+    medicine_db = pd.read_csv("master_medicines.csv")
+    medicine_db["search_key"] = medicine_db["name"].str.lower().str.strip()
 
 
-def preprocess(image_bytes):
+def preprocess(image_bytes: bytes):
     img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_GRAYSCALE)
-    return cv2.threshold(img, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    _, thresh = cv2.threshold(
+        img, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    return thresh
 
 
 def extract_text(image):
@@ -36,6 +42,10 @@ async def upload(file: UploadFile = File(...)):
     text = extract_text(processed)
 
     results = []
+
+    if medicine_db is None:
+        return {"medicines": []}
+
     for line in text.split("\n"):
         line = line.strip()
         if len(line) < 4:
@@ -53,6 +63,7 @@ async def upload(file: UploadFile = File(...)):
                 "detected_name": row["name"],
                 "price": float(row["price"]),
                 "type": row.get("type", "Generic"),
+                "buy_link": f"https://www.google.com/search?q=buy+{row['name'].replace(' ', '+')}",
             })
 
     return {"medicines": results}
