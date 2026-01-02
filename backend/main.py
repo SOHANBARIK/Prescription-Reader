@@ -100,6 +100,15 @@ async def upload_file(file: UploadFile = File(...)):
     content = await file.read()
     return {"medicines": analyze_and_recommend(content)}
 
+@app.get("/healthz")
+def health_check():
+    return {"status": "ok"}
+
+@app.get("/")
+def root():
+    return {"message": "Medicine OCR and Recommendation API is running."}
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 5000))
