@@ -4,6 +4,7 @@ export default function Footer() {
       <div>
         © {new Date().getFullYear()} AushadhiSetu · Bridging Health & Savings
       </div>
+      <div className="fixed-middle">made with ❤️ from Sohan</div>
       <div className="footer-right">Built for affordable healthcare in India 🇮🇳</div>
     </footer>
   );
