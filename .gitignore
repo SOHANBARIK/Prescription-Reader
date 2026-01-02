@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Large datasets
+backend/indian_medicines.csv
+backend/janaushadhi_data.csv
+
+# Node
+node_modules/
+dist/
