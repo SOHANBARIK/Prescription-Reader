@@ -38,7 +38,7 @@ export default function Upload() {
       navigate("/results", { state: meds });
     } catch (e) {
       console.error(e);
-      setError("Upload failed. Is backend running at http://localhost:5000 ? ");
+      setError("Server is waking up. First scan may take 20–30 seconds on free tier.");
     } finally {
       setLoading(false);
     }
