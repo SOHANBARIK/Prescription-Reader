@@ -20,9 +20,9 @@ export default function App() {
           </Routes>
         </main>
         <Footer />
-        <div className="fixed-bottom-footer">
+        {/* <div className="fixed-bottom-footer">
         made with ❤️ from Sohan
-  </div>
+  </div> */}
 
       </div>
     </BrowserRouter>
