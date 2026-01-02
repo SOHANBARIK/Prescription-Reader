@@ -17,7 +17,7 @@ reader = None
 async def lifespan(app: FastAPI):
     global medicine_db, reader
     print("Loading AI Model...")
-    reader = easyocr.Reader(['en'], gpu=False) 
+    reader = easyocr.Reader(['en'], gpu=False, verbose=False) 
     
     if os.path.exists("master_medicines.csv"):
         medicine_db = pd.read_csv("master_medicines.csv")
