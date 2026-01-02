@@ -1,37 +1,64 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import easyocr
-import io
 import cv2
 import numpy as np
-from rapidfuzz import process, fuzz, utils
 import pandas as pd
-from contextlib import asynccontextmanager
 import os
+from rapidfuzz import process, fuzz, utils
 
-# --- Global Variables ---
+# -----------------------------
+# Globals (lazy initialized)
+# -----------------------------
 medicine_db = None
 reader = None
 
+
+def get_reader():
+    """
+    Lazy-load EasyOCR reader.
+    This prevents Render from OOM-ing during startup.
+    """
+    global reader
+    if reader is None:
+        print("🔄 Loading EasyOCR model (lazy)...")
+        reader = easyocr.Reader(
+            ['en'],
+            gpu=False,
+            verbose=False
+        )
+        print("✅ EasyOCR model loaded")
+    return reader
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global medicine_db, reader
-    print("Loading AI Model...")
-    reader = easyocr.Reader(['en'], gpu=False, verbose=False) 
-    
+    global medicine_db
+    print("🚀 Starting AushadhiSetu Backend")
+
+    # Load medicine DB if present
     if os.path.exists("master_medicines.csv"):
         medicine_db = pd.read_csv("master_medicines.csv")
-        if 'search_key' not in medicine_db.columns:
-            medicine_db['search_key'] = medicine_db['name'].astype(str).apply(lambda x: x.lower().strip())
-        print("✅ Medicine Database Loaded!")
+        if "search_key" not in medicine_db.columns:
+            medicine_db["search_key"] = (
+                medicine_db["name"].astype(str).str.lower().str.strip()
+            )
+        print("✅ Medicine database loaded")
     else:
-        print("⚠️ Warning: master_medicines.csv not found.")
+        print("⚠️ master_medicines.csv not found (running without DB)")
+
     yield
+
+    print("🛑 Shutting down backend")
     medicine_db = None
-    reader = None
+
 
 app = FastAPI(lifespan=lifespan)
 
+# -----------------------------
+# CORS (safe for Vercel)
+# -----------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -39,77 +66,105 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_cheaper_alternative(medicine_name, current_price):
-    if medicine_db is None: return None
-    search_term = medicine_name.split()[0].lower()
-    matches = medicine_db[medicine_db['search_key'].str.contains(search_term, na=False)]
-    cheaper_options = matches[matches['price'] < current_price].sort_values(by='price')
-    
-    if not cheaper_options.empty:
-        best = cheaper_options.iloc[0]
-        return {"name": best['name'], "price": float(best['price']), "manufacturer": best['manufacturer'], "savings": float(current_price - best['price'])}
-    return None
 
-def preprocess_image(image_bytes):
+# -----------------------------
+# Helper functions
+# -----------------------------
+def preprocess_image(image_bytes: bytes):
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    _, thresh = cv2.threshold(
+        gray, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
     return thresh
 
-def analyze_and_recommend(image_bytes):
-    processed_img = preprocess_image(image_bytes)
-    results = reader.readtext(processed_img, detail=0)
-    
-    output_data = []
-    # Added "syp" (Syrup) to keywords since your image has it
-    keywords = ['tab', 'cap', 'syp', 'syrup', 'mg', 'ml', 'tablet', 'capsule']
-    potential_meds = [line for line in results if any(k in line.lower() for k in keywords)]
-    if not potential_meds: potential_meds = results
 
-    for raw_text in potential_meds:
-        if len(raw_text) < 4: continue
-        
+def get_cheaper_alternative(medicine_name: str, current_price: float):
+    if medicine_db is None:
+        return None
+
+    search_term = medicine_name.split()[0].lower()
+    matches = medicine_db[
+        medicine_db["search_key"].str.contains(search_term, na=False)
+    ]
+
+    cheaper = matches[matches["price"] < current_price].sort_values("price")
+
+    if cheaper.empty:
+        return None
+
+    best = cheaper.iloc[0]
+    return {
+        "name": best["name"],
+        "price": float(best["price"]),
+        "manufacturer": best.get("manufacturer", "Unknown"),
+        "savings": float(current_price - best["price"]),
+    }
+
+
+def analyze_and_recommend(image_bytes: bytes):
+    reader = get_reader()
+    processed = preprocess_image(image_bytes)
+    results = reader.readtext(processed, detail=0)
+
+    output = []
+    keywords = ["tab", "cap", "syp", "syrup", "mg", "ml", "tablet", "capsule"]
+    candidates = [
+        r for r in results if any(k in r.lower() for k in keywords)
+    ] or results
+
+    for text in candidates:
+        if len(text) < 4:
+            continue
+
         if medicine_db is not None:
-            match = process.extractOne(utils.default_process(raw_text), medicine_db['search_key'], scorer=fuzz.WRatio)
-            if match and match[1] > 55: # Lowered threshold slightly for handwriting
-                matched_row = medicine_db.iloc[match[2]]
-                price = float(matched_row['price'])
-                output_data.append({
-                    "detected_name": matched_row['name'],
-                    "original_text": raw_text,
+            match = process.extractOne(
+                utils.default_process(text),
+                medicine_db["search_key"],
+                scorer=fuzz.WRatio,
+            )
+
+            if match and match[1] > 55:
+                row = medicine_db.iloc[match[2]]
+                price = float(row["price"])
+                output.append({
+                    "detected_name": row["name"],
+                    "original_text": text,
                     "price": price,
-                    "type": matched_row['type'],
-                    "buy_link": f"https://www.google.com/search?q=buy+{matched_row['name'].replace(' ', '+')}",
-                    "alternative": get_cheaper_alternative(matched_row['name'], price)
+                    "type": row.get("type", "Generic"),
+                    "buy_link": f"https://www.google.com/search?q=buy+{row['name'].replace(' ', '+')}",
+                    "alternative": get_cheaper_alternative(row["name"], price),
                 })
                 continue
-        
-        output_data.append({
-            "detected_name": raw_text,
-            "original_text": raw_text,
+
+        output.append({
+            "detected_name": text,
+            "original_text": text,
             "price": "N/A",
             "type": "Unknown",
-            "buy_link": f"https://www.google.com/search?q=buy+{raw_text.replace(' ', '+')}",
-            "alternative": None
+            "buy_link": f"https://www.google.com/search?q=buy+{text.replace(' ', '+')}",
+            "alternative": None,
         })
-    return output_data
 
+    return output
+
+
+# -----------------------------
+# Routes
+# -----------------------------
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    content = await file.read()
-    return {"medicines": analyze_and_recommend(content)}
+async def upload(file: UploadFile = File(...)):
+    image_bytes = await file.read()
+    medicines = analyze_and_recommend(image_bytes)
+    return {"medicines": medicines}
+
 
 @app.get("/healthz")
 def health_check():
     return {"status": "ok"}
 
+
 @app.get("/")
 def root():
-    return {"message": "Medicine OCR and Recommendation API is running."}
-
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 5000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    return {"message": "AushadhiSetu OCR API is running"}
