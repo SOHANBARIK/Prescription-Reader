@@ -3,6 +3,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function Upload() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -26,7 +28,7 @@ export default function Upload() {
     form.append("file", file);
 
     try {
-      const res = await axios.post("http://localhost:5000/upload", form, {
+      const res = await axios.post(`${API_BASE_URL}/upload`, form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
