@@ -19,7 +19,13 @@ async def lifespan(app: FastAPI):
 
     # Load OCR model ONCE at startup
     print("🔄 Loading EasyOCR model (startup warm-up)...")
-    reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+    reader = easyocr.Reader(
+    ['en'],
+    gpu=False,
+    verbose=False,
+    quantize=True  # 👈 this is critical
+)
+
     print("✅ EasyOCR ready")
 
     if os.path.exists("master_medicines.csv"):
