@@ -33,12 +33,13 @@ export default function Upload() {
       });
 
       const meds = res.data.medicines || [];
-      // persist so results survive hard refresh / navigation
       sessionStorage.setItem("aushadhi_results", JSON.stringify(meds));
       navigate("/results", { state: meds });
     } catch (e) {
       console.error(e);
-      setError("Server is waking up. First scan may take 20–30 seconds on free tier.");
+      setError(
+        "Server is waking up. First scan may take 20–30 seconds on free tier."
+      );
     } finally {
       setLoading(false);
     }
@@ -46,21 +47,40 @@ export default function Upload() {
 
   return (
     <div className="upload-page container-grid">
-      <section className="upload-left card">
+      
+      {/* 🔹 TOUR TARGET */}
+      <section className="upload-left card upload-box">
         <h2>Upload Prescription</h2>
-        <p className="muted">Take a clear photo of the prescription or upload a scan.</p>
+        <p className="muted">
+          Take a clear photo of the prescription or upload a scan.
+        </p>
 
         <label className="dropzone">
           <input type="file" accept="image/*" onChange={handleFile} />
-          {!preview && <div className="dz-placeholder">Click or drop image here</div>}
-          {preview && <img src={preview} alt="preview" className="preview" />}
+          {!preview && (
+            <div className="dz-placeholder">Click or drop image here</div>
+          )}
+          {preview && (
+            <img src={preview} alt="preview" className="preview" />
+          )}
         </label>
 
         <div className="upload-actions">
-          <button className="btn btn-primary" onClick={doUpload} disabled={loading}>
+          <button
+            className="btn btn-primary"
+            onClick={doUpload}
+            disabled={loading}
+          >
             {loading ? "Scanning..." : "Scan Prescription"}
           </button>
-          <button className="btn btn-ghost" onClick={() => { setFile(null); setPreview(null); setError(""); }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              setFile(null);
+              setPreview(null);
+              setError("");
+            }}
+          >
             Reset
           </button>
         </div>
@@ -81,7 +101,10 @@ export default function Upload() {
 
         <div className="card">
           <h4>Privacy</h4>
-          <p className="muted">Images are processed only to detect medicine names — no personal data is stored persistently.</p>
+          <p className="muted">
+            Images are processed only to detect medicine names — no personal data
+            is stored persistently.
+          </p>
         </div>
       </aside>
     </div>

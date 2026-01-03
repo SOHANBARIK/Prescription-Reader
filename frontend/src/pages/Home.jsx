@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
+import HowItWorks from "./HowItWorks";
 
 export default function Home() {
   const nav = useNavigate();
@@ -16,9 +17,12 @@ export default function Home() {
           <div>💊 Genuine Medicines</div>
           <div>💰 Affordable Alternatives</div>
           <div>📸 Upload Prescriptions</div>
+          <div>⚡ Instant Results</div>
+          
         </div>
 
         <div className="hero-actions">
+          <button className="btn btn-secondary" onClick={() => nav("/how-it-works")}>How It Works ❓</button>
           <button className="btn btn-primary" onClick={() => nav("/upload")}>Upload Prescription 📸</button>
           <button className="btn btn-outline" onClick={() => nav("/about")}>Learn More</button>
         </div>
