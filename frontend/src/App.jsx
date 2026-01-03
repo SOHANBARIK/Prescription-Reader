@@ -7,6 +7,7 @@ import Results from "./pages/Results";
 import About from "./pages/About";
 import DisclaimerModel from "./components/DisclaimerModel";
 import HowItWorks from "./pages/HowItWorks";
+import WhereToBuy from "./pages/WhereToBuy";   // #Change 3
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/upload" element={<Upload />} />
             <Route path="/results" element={<Results />} />
             <Route path="/about" element={<About />} />
+            <Route path="/where-to-buy" element={<WhereToBuy />} />   
           </Routes>
         </main>
         <Footer />
